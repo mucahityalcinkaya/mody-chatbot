@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MODY Risk Değerlendirmesi</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body { background: #FAF8F5; }
+        .typing-indicator { display: flex; gap: 4px; padding: 8px 12px; }
+        .typing-indicator span { width: 8px; height: 8px; background: #A89F91; border-radius: 50%; animation: bounce 1.4s infinite ease-in-out; }
+        .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
+        .message-appear { animation: slideIn 0.3s ease-out; }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .warm-gradient { background: linear-gradient(135deg, #D4A574 0%, #C4956A 100%); }
+        .chat-area { height: calc(100vh - 180px); min-height: 300px; max-height: 500px; }
+        @media (max-width: 640px) { .chat-area { height: calc(100vh - 200px); } }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+    <!-- Header -->
+    <header class="warm-gradient text-white py-3 shadow-lg flex-shrink-0">
+        <div class="container mx-auto px-4 flex items-center justify-between max-w-2xl">
+            <div class="flex items-center gap-2">
+                <span class="text-2xl">🧬</span>
+                <div>
+                    <h1 class="text-lg font-bold">MODY Risk Değerlendirmesi</h1>
+                    <p class="text-xs text-orange-100">Yapay Zeka Destekli</p>
+                </div>
+            </div>
+            <button onclick="resetChat()" class="bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg text-sm">🔄 Yeni</button>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 container mx-auto px-3 py-3 max-w-2xl flex flex-col">
+        <!-- Chat Box -->
+        <div class="bg-white rounded-2xl shadow-lg overflow-hidden flex flex-col flex-1">
+            <!-- Chat Header -->
+            <div class="bg-stone-50 px-4 py-3 border-b border-stone-200 flex items-center gap-3 flex-shrink-0">
+                <div class="w-9 h-9 rounded-full warm-gradient flex items-center justify-center text-white font-bold text-sm">M</div>
+                <div>
+                    <h3 class="font-semibold text-stone-700 text-sm">MODY Asistan</h3>
+                    <p class="text-xs text-green-600">● Çevrimiçi</p>
+                </div>
+            </div>
+            
+            <!-- Messages -->
+            <div id="chat-container" class="chat-area overflow-y-auto p-4 space-y-3 bg-stone-50 flex-1">
+                <div class="flex gap-2 message-appear">
+                    <div class="w-7 h-7 rounded-full warm-gradient flex items-center justify-center text-white text-xs flex-shrink-0">M</div>
+                    <div class="bg-white p-3 rounded-2xl rounded-tl-none shadow-sm max-w-[85%] border border-stone-100">
+                        <p class="text-stone-700 text-sm">Merhaba! 👋 MODY risk değerlendirmesi için size birkaç soru soracağım.</p>
+                        <p class="text-stone-700 text-sm mt-1"><strong>"Merhaba"</strong> yazarak başlayabilirsiniz.</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Input -->
+            <div class="p-3 bg-white border-t border-stone-200 flex-shrink-0">
+                <div class="flex gap-2">
+                    <input type="text" id="user-input" 
+                        class="flex-1 p-3 border border-stone-300 rounded-xl focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-200 text-sm"
+                        placeholder="Mesajınızı yazın..."
+                        onkeypress="if(event.key==='Enter')sendMessage()"
+                        autocomplete="off">
+                    <button onclick="sendMessage()" id="send-btn" 
+                        class="warm-gradient hover:opacity-90 text-white px-5 py-3 rounded-xl text-sm font-medium">
+                        Gönder
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Results (Hidden initially) -->
+        <div id="results-container" class="hidden mt-4 space-y-4">
+            <!-- Summary Cards -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div class="bg-white p-3 rounded-xl shadow border border-stone-100">
+                    <p class="text-stone-500 text-xs">Toplam Senaryo</p>
+                    <p id="stat-total" class="text-xl font-bold text-amber-700">-</p>
+                </div>
+                <div class="bg-white p-3 rounded-xl shadow border border-stone-100">
+                    <p class="text-stone-500 text-xs">Min PPV</p>
+                    <p id="stat-min" class="text-xl font-bold text-green-600">-</p>
+                </div>
+                <div class="bg-white p-3 rounded-xl shadow border border-stone-100">
+                    <p class="text-stone-500 text-xs">Max PPV</p>
+                    <p id="stat-max" class="text-xl font-bold text-red-500">-</p>
+                </div>
+                <div class="bg-white p-3 rounded-xl shadow border border-stone-100">
+                    <p class="text-stone-500 text-xs">Ortalama</p>
+                    <p id="stat-avg" class="text-xl font-bold text-amber-600">-</p>
+                </div>
+            </div>
+            
+            <!-- Results Table -->
+            <div class="bg-white rounded-xl shadow border border-stone-100 overflow-hidden">
+                <div class="px-4 py-3 border-b border-stone-100 bg-stone-50">
+                    <h2 class="font-bold text-stone-700">📊 Detaylı Sonuçlar</h2>
+                </div>
+                <div class="p-4 overflow-x-auto">
+                    <div id="results-table"></div>
+                </div>
+            </div>
+            
+            <!-- Chart -->
+            <div class="bg-white rounded-xl shadow border border-stone-100 overflow-hidden">
+                <div class="px-4 py-3 border-b border-stone-100 bg-stone-50">
+                    <h2 class="font-bold text-stone-700">📈 Risk Grafiği</h2>
+                </div>
+                <div class="p-4">
+                    <canvas id="results-chart" height="200"></canvas>
+                </div>
+            </div>
+            
+            <!-- Warning -->
+            <div class="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                <h3 class="font-bold text-amber-800 flex items-center gap-2">⚠️ Önemli Uyarı</h3>
+                <p class="text-amber-700 text-sm mt-2">
+                    Bu sonuçlar <strong>kesin tanı değildir</strong>. MODY tanısı ancak genetik test ile konulabilir. 
+                    Sonuçlarınızı mutlaka bir endokrinoloji uzmanı ile paylaşın.
+                </p>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let chatContainer = document.getElementById('chat-container');
+        let chart = null;
+        let isWaiting = false;
+
+        function addMessage(role, content, isTyping = false) {
+            const div = document.createElement('div');
+            div.className = `flex gap-2 message-appear ${role === 'user' ? 'flex-row-reverse' : ''}`;
+            
+            if (isTyping) {
+                div.id = 'typing-indicator';
+                div.innerHTML = `<div class="w-7 h-7 rounded-full warm-gradient flex items-center justify-center text-white text-xs flex-shrink-0">M</div>
+                    <div class="bg-white p-2 rounded-2xl shadow-sm border border-stone-100"><div class="typing-indicator"><span></span><span></span><span></span></div></div>`;
+            } else if (role === 'user') {
+                div.innerHTML = `<div class="w-7 h-7 rounded-full bg-stone-300 flex items-center justify-center text-xs flex-shrink-0">👤</div>
+                    <div class="bg-amber-600 text-white p-3 rounded-2xl rounded-tr-none shadow-sm max-w-[85%]"><p class="text-sm">${escapeHtml(content)}</p></div>`;
+            } else {
+                div.innerHTML = `<div class="w-7 h-7 rounded-full warm-gradient flex items-center justify-center text-white text-xs flex-shrink-0">M</div>
+                    <div class="bg-white p-3 rounded-2xl rounded-tl-none shadow-sm max-w-[85%] border border-stone-100"><p class="text-sm text-stone-700">${formatMessage(content)}</p></div>`;
+            }
+            chatContainer.appendChild(div);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function formatMessage(text) {
+            // Bold ve newline formatla
+            return escapeHtml(text)
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\n/g, '<br>');
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('user-input');
+            const message = input.value.trim();
+            if (!message || isWaiting) return;
+            
+            addMessage('user', message);
+            input.value = '';
+            isWaiting = true;
+            document.getElementById('send-btn').disabled = true;
+            addMessage('', '', true);
+            
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({message})
+                });
+                const data = await response.json();
+                
+                document.getElementById('typing-indicator')?.remove();
+                addMessage('assistant', data.response);
+                
+                if (data.json_result) {
+                    // Hesaplama yap
+                    addMessage('', '', true);
+                    const calcRes = await fetch('/api/calculate', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(data.json_result)
+                    });
+                    document.getElementById('typing-indicator')?.remove();
+                    
+                    const calcData = await calcRes.json();
+                    if (calcData.success) {
+                        addMessage('assistant', calcData.result_text);
+                        showResults(calcData.results, calcData.summary);
+                    } else {
+                        addMessage('assistant', '❌ Hesaplama hatası: ' + calcData.error);
+                    }
+                }
+            } catch (e) {
+                document.getElementById('typing-indicator')?.remove();
+                addMessage('assistant', '❌ Hata: ' + e.message);
+            }
+            isWaiting = false;
+            document.getElementById('send-btn').disabled = false;
+            input.focus();
+        }
+
+        function showResults(results, summary) {
+            document.getElementById('results-container').classList.remove('hidden');
+            document.getElementById('stat-total').textContent = summary.total_scenarios;
+            document.getElementById('stat-min').textContent = summary.min_ppv + '%';
+            document.getElementById('stat-max').textContent = summary.max_ppv + '%';
+            document.getElementById('stat-avg').textContent = summary.avg_ppv + '%';
+            
+            // Tablo
+            let html = '<table class="w-full text-sm"><thead><tr class="bg-stone-100 text-left"><th class="p-2 rounded-tl-lg">#</th><th class="p-2">Tip</th><th class="p-2">Aile DM</th><th class="p-2">HbA1c</th><th class="p-2 rounded-tr-lg">PPV</th></tr></thead><tbody>';
+            results.forEach((r, i) => {
+                const ppv = r.mody_result.ppv_adjusted;
+                const ppvColor = ppv >= 25 ? 'text-red-600 font-bold' : ppv >= 10 ? 'text-amber-600 font-semibold' : 'text-green-600';
+                const pardmText = r.scenario.pardm === 1 ? '✓ Var' : '✗ Yok';
+                html += `<tr class="border-b border-stone-100 hover:bg-stone-50">
+                    <td class="p-2">${i+1}</td>
+                    <td class="p-2"><span class="px-2 py-0.5 rounded text-xs ${r.scenario.t1t2 === 1 ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">Tip ${r.scenario.t1t2}</span></td>
+                    <td class="p-2">${pardmText}</td>
+                    <td class="p-2">%${r.scenario.hba1c}</td>
+                    <td class="p-2 ${ppvColor}">%${ppv}</td>
+                </tr>`;
+            });
+            html += '</tbody></table>';
+            document.getElementById('results-table').innerHTML = html;
+            
+            // Grafik
+            if (chart) chart.destroy();
+            const colors = results.map(r => {
+                const ppv = r.mody_result.ppv_adjusted;
+                if (ppv >= 25) return 'rgba(239, 68, 68, 0.7)';
+                if (ppv >= 10) return 'rgba(217, 119, 6, 0.7)';
+                return 'rgba(34, 197, 94, 0.7)';
+            });
+            
+            chart = new Chart(document.getElementById('results-chart'), {
+                type: 'bar',
+                data: {
+                    labels: results.map((_, i) => `Senaryo ${i+1}`),
+                    datasets: [{
+                        label: 'PPV (%)',
+                        data: results.map(r => r.mody_result.ppv_adjusted),
+                        backgroundColor: colors,
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true, max: 100, ticks: { callback: v => v + '%' } } }
+                }
+            });
+            
+            // Sonuçlara kaydır
+            setTimeout(() => {
+                document.getElementById('results-container').scrollIntoView({ behavior: 'smooth' });
+            }, 500);
+        }
+
+        async function resetChat() {
+            await fetch('/api/reset', {method: 'POST'});
+            chatContainer.innerHTML = `<div class="flex gap-2 message-appear">
+                <div class="w-7 h-7 rounded-full warm-gradient flex items-center justify-center text-white text-xs flex-shrink-0">M</div>
+                <div class="bg-white p-3 rounded-2xl rounded-tl-none shadow-sm max-w-[85%] border border-stone-100">
+                    <p class="text-stone-700 text-sm">Merhaba! 👋 MODY risk değerlendirmesi için <strong>"Merhaba"</strong> yazın.</p>
+                </div>
+            </div>`;
+            document.getElementById('results-container').classList.add('hidden');
+            if (chart) chart.destroy();
+        }
+
+        window.onload = () => document.getElementById('user-input').focus();
+    </script>
+</body>
+</html>
